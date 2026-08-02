@@ -12,6 +12,9 @@ cap = cv2.VideoCapture(0)
 RIGHT_EYE = [33, 133, 159, 145, 153, 154, 155]
 LEFT_EYE = [362, 263, 386, 374, 380, 381, 382]
 
+RIGHT_IRIS = [469, 470, 471, 472]
+LEFT_IRIS = [474, 475, 476, 477]
+
 
 while True:
     success, frame = cap.read()
@@ -42,10 +45,22 @@ while True:
                 (0, 255, 255),
                 1
             )
-
+        for idx in RIGHT_IRIS + LEFT_IRIS:
+            x = int(face.landmark[idx].x * w)
+            y = int(face.landmark[idx].y * h)
+            cv2.circle(frame, (x, y), 3, (0, 0, 255), -1)
+            cv2.putText(
+                frame,
+                str(idx),
+                (x + 5, y - 5),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.4,
+                (255, 255, 0),
+                1
+            )
 
         
-    cv2.imshow("Eye Landmarks", frame)
+    cv2.imshow("Eye and Iris Landmarks", frame)
     if cv2.waitKey(1) & 0xFF == 27:
         break
 cap.release()
