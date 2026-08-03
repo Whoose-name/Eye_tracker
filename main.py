@@ -33,8 +33,9 @@ while True:
         face = results.multi_face_landmarks[0]
         h, w, _ = frame.shape
         for idx in RIGHT_EYE + LEFT_EYE:
-            x = int(face.landmark[idx].x * w)
-            y = int(face.landmark[idx].y * h)
+            landmark = face.landmark[idx]
+            x = int(landmark.x * w)
+            y = int(landmark.y * h)
             cv2.circle(frame, (x, y), 2, (0, 255, 0), -1)
             cv2.putText(
                 frame,
@@ -45,19 +46,36 @@ while True:
                 (0, 255, 255),
                 1
             )
-        for idx in RIGHT_IRIS + LEFT_IRIS:
-            x = int(face.landmark[idx].x * w)
-            y = int(face.landmark[idx].y * h)
-            cv2.circle(frame, (x, y), 3, (0, 0, 255), -1)
+        for iris in [RIGHT_IRIS, LEFT_IRIS]:
+            iris_points=[]
+            for idx in iris:
+                landmark = face.landmark[idx]
+                x = int(landmark.x * w)
+                y = int(landmark.y * h)
+                iris_points.append((x, y))
+                cv2.circle(frame, (x, y), 3, (0, 0, 255), -1)
+                cv2.putText(
+                    frame,
+                    str(idx),
+                    (x + 5, y - 5),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.4,
+                    (255, 255, 0),
+                    1
+                )
+            center_x = int(sum([p[0] for p in iris_points]) // len(iris_points))
+            center_y = int(sum([p[1] for p in iris_points]) // len(iris_points))
+            cv2.circle(frame, (center_x, center_y), 5, (255, 0, 255), -1)
             cv2.putText(
                 frame,
-                str(idx),
-                (x + 5, y - 5),
+                "Center",
+                (center_x + 8, center_y),
                 cv2.FONT_HERSHEY_SIMPLEX,
-                0.4,
-                (255, 255, 0),
+                0.5,
+                (255, 0, 255),
                 1
             )
+
 
         
     cv2.imshow("Eye and Iris Landmarks", frame)
