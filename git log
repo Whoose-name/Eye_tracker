@@ -1,0 +1,22 @@
+Refactor eye tracking pipeline and improve code organization
+    Description:
+        Changes:
+        - Introduced reusable helper functions:
+            - euclidean_distance()
+            - landmark_to_pixel()
+            - calculate_iris_center()
+            - calculate_gaze()
+
+        - Moved gaze and blink thresholds into global constants.
+
+        - Refactored repeated landmark-to-pixel conversion using helper functions.
+
+        - Centralized eye-specific configuration using the EYES dictionary.
+
+        - Simplified iris center calculation.
+
+        - Reduced duplicate code and improved readability.
+
+        - Standardized gaze ratio, direction, and blink detection workflow.
+
+        - Improved maintainability in preparation for continuous gaze estimation and calibration.

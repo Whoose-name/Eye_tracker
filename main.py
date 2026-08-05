@@ -61,11 +61,24 @@ EYES = [
 EAR_THRESHOLD = 0.20
 LEFT_THRESHOLD = 0.40
 RIGHT_THRESHOLD = 0.60
+
 WHITE = (255, 255, 255)
 GREEN = (0, 255, 0)
 RED = (0, 0, 255)
 YELLOW = (255, 255, 0)
 PURPLE = (255, 0, 255)
+
+BOX_WIDTH = 400
+BOX_HEIGHT = 250
+BOX_X = 100
+BOX_Y = 100
+
+SMOOTHING_WINDOW = 5
+horizontal_history = []
+vertical_history = []
+
+left_cal=right_cal=0.5
+up_cal=down_cal=0.5
 
 # -------------------------------
 # Helper Functions
@@ -93,16 +106,19 @@ def calculate_gaze(left_corner, right_corner, upper_eyelid, lower_eyelid, iris_c
     eye_width = euclidean_distance(left_corner, right_corner)
     eye_height = euclidean_distance(upper_eyelid, lower_eyelid)
 
-    iris_distance = euclidean_distance(left_corner, iris_center)
+    iris_horizontal_distance = iris_center[0] - left_corner[0]
+    horizontal_ratio = iris_horizontal_distance / eye_width
 
-    ratio = iris_distance / eye_width
+    iris_vertical_distance = iris_center[1] - upper_eyelid[1]
+    vertical_ratio = iris_vertical_distance / eye_height
+ 
     ear = eye_height / eye_width
-    if ratio < LEFT_THRESHOLD:direction = "LEFT"
-    elif ratio > RIGHT_THRESHOLD:direction = "RIGHT"
+
+    if horizontal_ratio < LEFT_THRESHOLD:direction = "LEFT"
+    elif horizontal_ratio > RIGHT_THRESHOLD:direction = "RIGHT"
     else:direction = "CENTER"
 
-
-    return ratio, direction, ear
+    return horizontal_ratio, vertical_ratio, direction, ear
 
 # -------------------------------
 # Main Loop
@@ -115,10 +131,18 @@ while True:
     h, w, _ = frame.shape
     rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     results = face_mesh.process(rgb_frame)
-    EYES[1]["ratio_pos"] = (w - 260, 40)
-    EYES[1]["direction_pos"] = (w - 260, 80)
-    EYES[1]["ear_pos"] = (w - 260, 120)
-    EYES[1]["blink_status_pos"] = (w - 260, 160)
+    if EYES[1]["ratio_pos"] is None:
+        EYES[1]["ratio_pos"] = (w - 260, 40)
+        EYES[1]["direction_pos"] = (w - 260, 80)
+        EYES[1]["ear_pos"] = (w - 260, 120)
+        EYES[1]["blink_status_pos"] = (w - 260, 160)
+
+    right_horizontal_ratio = None
+    left_horizontal_ratio = None
+
+    right_vertical_ratio = None
+    left_vertical_ratio = None
+
     if results.multi_face_landmarks:
     
         face = results.multi_face_landmarks[0]
@@ -148,15 +172,7 @@ while True:
                 x, y = landmark_to_pixel(landmark, w, h)
                 iris_points.append((x, y))
                 cv2.circle(frame, (x, y), 3, RED, -1)
-                cv2.putText(
-                    frame,
-                    str(idx),
-                    (x + 5, y - 5),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.4,
-                    YELLOW,
-                    1
-                )
+                #cv2.putText(frame,str(idx),(x + 5, y - 5),cv2.FONT_HERSHEY_SIMPLEX,0.4,YELLOW,1)
 
             # -----------------------------------
             # Iris Center
@@ -197,23 +213,19 @@ while True:
             # Ratio Calculation
             # -----------------------------------
 
-            ratio,direction,ear=calculate_gaze(left_corner, right_corner, 
+            horizontal_ratio,vertical_ratio,direction,ear=calculate_gaze(left_corner, right_corner, 
                                                upper_eyelid, lower_eyelid, 
                                                iris_center)
             ratio_pos = eye["ratio_pos"]
             direction_pos = eye["direction_pos"]
             ear_pos = eye["ear_pos"]
             blink_status_pos = eye["blink_status_pos"]
-
-            cv2.putText(
-                frame,
-                f'{eye["name"]}: {ratio:.2f}',
-                ratio_pos,
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.7,
-                WHITE,
-                2
-            )
+            if eye["name"] == "Right Eye":
+                right_horizontal_ratio = horizontal_ratio
+                right_vertical_ratio = vertical_ratio
+            else:
+                left_horizontal_ratio = horizontal_ratio
+                left_vertical_ratio = vertical_ratio
 
             cv2.putText(
                 frame,
@@ -241,8 +253,91 @@ while True:
                 2
             )
 
-    cv2.imshow("Eye and Iris Landmarks", frame)
+    if right_horizontal_ratio is not None and left_horizontal_ratio is not None:
+        average_horizontal_ratio = (right_horizontal_ratio +left_horizontal_ratio) / 2
+        average_vertical_ratio = (right_vertical_ratio + left_vertical_ratio) / 2
+        cv2.putText(
+            frame,
+            f"H: {average_horizontal_ratio:.2f}",
+            (20, h - 45),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.6,
+            WHITE,
+            2
+        )
 
+        cv2.putText(
+            frame,
+            f"V: {average_vertical_ratio:.2f}",
+            (20, h - 20),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.6,
+            WHITE,
+            2
+        )
+        cv2.rectangle(
+        frame,
+        (BOX_X, BOX_Y),
+        (BOX_X + BOX_WIDTH, BOX_Y + BOX_HEIGHT),
+        WHITE,
+        2
+        )
+
+        horizontal_history.append(average_horizontal_ratio)
+        if len(horizontal_history) > SMOOTHING_WINDOW:
+            horizontal_history.pop(0)
+        smoothed_horizontal_ratio = sum(horizontal_history) / len(horizontal_history)
+
+        vertical_history.append(average_vertical_ratio)
+        if len(vertical_history) > SMOOTHING_WINDOW:
+            vertical_history.pop(0)
+        smoothed_vertical_ratio = sum(vertical_history) / len(vertical_history)
+
+    if horizontal_history and vertical_history:
+        smoothed_horizontal_ratio = max(0.0, min(smoothed_horizontal_ratio, 1.0))
+        smoothed_vertical_ratio = max(0.0, min(smoothed_vertical_ratio, 1.0))
+        #dot_x = BOX_X + int(smoothed_horizontal_ratio * BOX_WIDTH)
+        #dot_y = BOX_Y + int(smoothed_vertical_ratio * BOX_HEIGHT)
+
+        if smoothed_horizontal_ratio < left_cal:
+            left_cal = smoothed_horizontal_ratio
+        if smoothed_horizontal_ratio > right_cal:
+            right_cal = smoothed_horizontal_ratio
+        if smoothed_vertical_ratio < up_cal:
+            up_cal = smoothed_vertical_ratio
+        if smoothed_vertical_ratio > down_cal:
+            down_cal = smoothed_vertical_ratio
+
+
+
+        cv2.putText(
+            frame,
+            f"Calibrated H: {left_cal:.2f} - {right_cal:.2f}",
+            (20, h - 70),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.6,
+            WHITE,
+            2
+        )
+        cv2.putText(
+            frame,
+            f"Calibrated V: {up_cal:.2f} - {down_cal:.2f}",
+            (20, h - 95),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.6,
+            WHITE,
+            2
+        )
+        normalized_x = (smoothed_horizontal_ratio - left_cal) / (right_cal - left_cal)
+        normalized_y = (smoothed_vertical_ratio - up_cal) / (down_cal - up_cal)
+        normalized_x = max(0.0, min(normalized_x, 1.0))
+        normalized_y = max(0.0, min(normalized_y, 1.0)) 
+        dot_x = BOX_X + int(normalized_x * BOX_WIDTH)
+        dot_y = BOX_Y + int(normalized_y * BOX_HEIGHT)
+        cv2.circle(frame,(dot_x, dot_y),8,GREEN,-1)
+
+
+    cv2.imshow("Eye and Iris Landmarks", frame)
     if cv2.waitKey(1) & 0xFF == 27:
         break
 
