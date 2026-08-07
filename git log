@@ -6,17 +6,42 @@ Refactor eye tracking pipeline and improve code organization
             - landmark_to_pixel()
             - calculate_iris_center()
             - calculate_gaze()
-
         - Moved gaze and blink thresholds into global constants.
-
         - Refactored repeated landmark-to-pixel conversion using helper functions.
-
         - Centralized eye-specific configuration using the EYES dictionary.
-
         - Simplified iris center calculation.
-
         - Reduced duplicate code and improved readability.
-
         - Standardized gaze ratio, direction, and blink detection workflow.
-
         - Improved maintainability in preparation for continuous gaze estimation and calibration.
+
+
+5-08-2026 21:17
+    Implemented the first complete gaze estimation pipeline.
+
+    Features added:
+    - Refactored gaze calculation into reusable helper functions.
+    - Added horizontal and vertical gaze ratio estimation.
+    - Added iris center computation.
+    - Added blink detection using Eye Aspect Ratio (EAR).
+    - Added temporal smoothing for gaze measurements.
+    - Added 2D gaze visualization using a movable indicator inside a bounding box.
+    - Introduced horizontal and vertical normalization logic.
+    - Added groundwork for gaze calibration by tracking calibration bounds.
+    - Improved code readability with constants, helper functions, and structured eye configuration.
+
+7-08-2026 23:08
+    Implemented a calibration-based gaze tracking pipeline.
+
+    Features added:
+    - Added horizontal and vertical gaze ratio calculations.
+    - Implemented moving-average smoothing for gaze estimation.
+    - Added calibration workflow using keyboard inputs (L, R, U, D).
+    - Stored calibration boundaries for left, right, up, and down gaze.
+    - Normalized raw gaze ratios into a 0–1 coordinate system.
+    - Added a visual gaze box with a cursor representing normalized gaze position.
+    - Added calibration status indicators and reset functionality.
+    - Added safeguards against invalid calibration values and division by zero.
+    - Refactored the tracking loop for clearer separation of gaze estimation, smoothing, calibration, and visualization.
+
+    Known limitations:
+    - Vertical gaze estimation is still unstable due to eyelid movement and will be redesigned in the next iteration.

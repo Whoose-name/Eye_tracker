@@ -77,8 +77,9 @@ SMOOTHING_WINDOW = 5
 horizontal_history = []
 vertical_history = []
 
-left_cal=right_cal=0.5
-up_cal=down_cal=0.5
+left_cal=right_cal=None
+up_cal=down_cal=None
+calibrated = False
 
 # -------------------------------
 # Helper Functions
@@ -118,6 +119,8 @@ def calculate_gaze(left_corner, right_corner, upper_eyelid, lower_eyelid, iris_c
     elif horizontal_ratio > RIGHT_THRESHOLD:direction = "RIGHT"
     else:direction = "CENTER"
 
+    if eye_width < 1 or eye_height < 1:
+        return None, None, None, None
     return horizontal_ratio, vertical_ratio, direction, ear
 
 # -------------------------------
@@ -125,6 +128,7 @@ def calculate_gaze(left_corner, right_corner, upper_eyelid, lower_eyelid, iris_c
 # -------------------------------
 
 while True:
+    key=cv2.waitKey(1) & 0xFF
     success, frame = cap.read()
     if not success:
         break
@@ -137,11 +141,11 @@ while True:
         EYES[1]["ear_pos"] = (w - 260, 120)
         EYES[1]["blink_status_pos"] = (w - 260, 160)
 
-    right_horizontal_ratio = None
-    left_horizontal_ratio = None
+    raw_right_horizontal_ratio = None
+    raw_left_horizontal_ratio = None
 
-    right_vertical_ratio = None
-    left_vertical_ratio = None
+    raw_right_vertical_ratio = None
+    raw_left_vertical_ratio = None
 
     if results.multi_face_landmarks:
     
@@ -213,7 +217,7 @@ while True:
             # Ratio Calculation
             # -----------------------------------
 
-            horizontal_ratio,vertical_ratio,direction,ear=calculate_gaze(left_corner, right_corner, 
+            raw_horizontal_ratio,raw_vertical_ratio,direction,ear=calculate_gaze(left_corner, right_corner, 
                                                upper_eyelid, lower_eyelid, 
                                                iris_center)
             ratio_pos = eye["ratio_pos"]
@@ -221,21 +225,13 @@ while True:
             ear_pos = eye["ear_pos"]
             blink_status_pos = eye["blink_status_pos"]
             if eye["name"] == "Right Eye":
-                right_horizontal_ratio = horizontal_ratio
-                right_vertical_ratio = vertical_ratio
+                raw_right_horizontal_ratio = raw_horizontal_ratio
+                raw_right_vertical_ratio = raw_vertical_ratio
             else:
-                left_horizontal_ratio = horizontal_ratio
-                left_vertical_ratio = vertical_ratio
+                raw_left_horizontal_ratio = raw_horizontal_ratio
+                raw_left_vertical_ratio = raw_vertical_ratio
 
-            cv2.putText(
-                frame,
-                direction,
-                direction_pos,
-                cv2.FONT_HERSHEY_SIMPLEX,
-                1,
-                GREEN,
-                2
-            )
+            cv2.putText(frame,direction,direction_pos,cv2.FONT_HERSHEY_SIMPLEX,1,GREEN,2)
             # -----------------------------------
             # Blink Detection
             # -----------------------------------
@@ -243,45 +239,14 @@ while True:
                 blink_status = "BLINKING"
             else:
                 blink_status = "NOT BLINKING"
-            cv2.putText(
-                frame,
-                blink_status,
-                blink_status_pos,
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.6,
-                GREEN,
-                2
-            )
+            cv2.putText(frame,blink_status,blink_status_pos,cv2.FONT_HERSHEY_SIMPLEX,0.6,GREEN,2)
 
-    if right_horizontal_ratio is not None and left_horizontal_ratio is not None:
-        average_horizontal_ratio = (right_horizontal_ratio +left_horizontal_ratio) / 2
-        average_vertical_ratio = (right_vertical_ratio + left_vertical_ratio) / 2
-        cv2.putText(
-            frame,
-            f"H: {average_horizontal_ratio:.2f}",
-            (20, h - 45),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.6,
-            WHITE,
-            2
-        )
-
-        cv2.putText(
-            frame,
-            f"V: {average_vertical_ratio:.2f}",
-            (20, h - 20),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.6,
-            WHITE,
-            2
-        )
-        cv2.rectangle(
-        frame,
-        (BOX_X, BOX_Y),
-        (BOX_X + BOX_WIDTH, BOX_Y + BOX_HEIGHT),
-        WHITE,
-        2
-        )
+    if raw_right_horizontal_ratio is not None and raw_left_horizontal_ratio is not None:
+        average_horizontal_ratio = (raw_right_horizontal_ratio + raw_left_horizontal_ratio) / 2
+        average_vertical_ratio = (raw_right_vertical_ratio + raw_left_vertical_ratio) / 2
+        cv2.putText(frame,f"H: {average_horizontal_ratio:.2f}",(20, h - 45),cv2.FONT_HERSHEY_SIMPLEX,0.6,WHITE,2)
+        cv2.putText(frame,f"V: {average_vertical_ratio:.2f}",(20, h - 20),cv2.FONT_HERSHEY_SIMPLEX,0.6,WHITE,2)
+        cv2.rectangle(frame,(BOX_X, BOX_Y),(BOX_X + BOX_WIDTH, BOX_Y + BOX_HEIGHT),WHITE,2)
 
         horizontal_history.append(average_horizontal_ratio)
         if len(horizontal_history) > SMOOTHING_WINDOW:
@@ -298,38 +263,39 @@ while True:
         smoothed_vertical_ratio = max(0.0, min(smoothed_vertical_ratio, 1.0))
         #dot_x = BOX_X + int(smoothed_horizontal_ratio * BOX_WIDTH)
         #dot_y = BOX_Y + int(smoothed_vertical_ratio * BOX_HEIGHT)
+        if key== ord('.'): 
+            calibrated = False
+            left_cal=right_cal=None
+            up_cal=down_cal=None
+        status = lambda v: "✓" if v is not None else "✗"
+        cv2.putText(frame,f"L {status(left_cal)}  R {status(right_cal)}  U {status(up_cal)}  D {status(down_cal)}",(20,60),cv2.FONT_HERSHEY_SIMPLEX,0.6,GREEN,2)
+        if not calibrated:
+            cv2.putText(frame,"Calibration: Press L,R,U,D while looking in those directions",(20, 30),cv2.FONT_HERSHEY_SIMPLEX,0.6,GREEN,2)
+            if key in (ord('l'), ord('L')):
+                left_cal = smoothed_horizontal_ratio
+            if key in (ord('r'), ord('R')):
+                right_cal = smoothed_horizontal_ratio
+            if key in (ord('u'), ord('U')):
+                up_cal = smoothed_vertical_ratio
+            if key in (ord('d'), ord('D')):
+                down_cal = smoothed_vertical_ratio
+            if None not in (left_cal, right_cal, up_cal, down_cal):
+                calibrated = True     
+        
 
-        if smoothed_horizontal_ratio < left_cal:
-            left_cal = smoothed_horizontal_ratio
-        if smoothed_horizontal_ratio > right_cal:
-            right_cal = smoothed_horizontal_ratio
-        if smoothed_vertical_ratio < up_cal:
-            up_cal = smoothed_vertical_ratio
-        if smoothed_vertical_ratio > down_cal:
-            down_cal = smoothed_vertical_ratio
 
+        if None not in (left_cal, right_cal) and abs(right_cal-left_cal) > 1e-6:
+            normalized_x = (smoothed_horizontal_ratio - left_cal) / (right_cal - left_cal)
+            cv2.putText(frame,f"Calibrated H: {left_cal:.2f} - {right_cal:.2f}",(20, h - 70),cv2.FONT_HERSHEY_SIMPLEX,0.6,WHITE,2)
+        else:
+            normalized_x = 0.0
 
+        if None not in (up_cal, down_cal) and abs(down_cal-up_cal) > 1e-6:
+            normalized_y = (smoothed_vertical_ratio - up_cal) / (down_cal - up_cal)
+            cv2.putText(frame,f"Calibrated V: {up_cal:.2f} - {down_cal:.2f}",(20, h - 95),cv2.FONT_HERSHEY_SIMPLEX,0.6,WHITE,2)
+        else:
+            normalized_y = 0.0
 
-        cv2.putText(
-            frame,
-            f"Calibrated H: {left_cal:.2f} - {right_cal:.2f}",
-            (20, h - 70),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.6,
-            WHITE,
-            2
-        )
-        cv2.putText(
-            frame,
-            f"Calibrated V: {up_cal:.2f} - {down_cal:.2f}",
-            (20, h - 95),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.6,
-            WHITE,
-            2
-        )
-        normalized_x = (smoothed_horizontal_ratio - left_cal) / (right_cal - left_cal)
-        normalized_y = (smoothed_vertical_ratio - up_cal) / (down_cal - up_cal)
         normalized_x = max(0.0, min(normalized_x, 1.0))
         normalized_y = max(0.0, min(normalized_y, 1.0)) 
         dot_x = BOX_X + int(normalized_x * BOX_WIDTH)
@@ -338,7 +304,7 @@ while True:
 
 
     cv2.imshow("Eye and Iris Landmarks", frame)
-    if cv2.waitKey(1) & 0xFF == 27:
+    if key == 27:
         break
 
 cap.release()
