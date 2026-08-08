@@ -45,3 +45,42 @@ Refactor eye tracking pipeline and improve code organization
 
     Known limitations:
     - Vertical gaze estimation is still unstable due to eyelid movement and will be redesigned in the next iteration.
+
+08-08-2026 21:40
+    Features added:
+    - Created a dedicated CNN-based eye tracking pipeline (eyetrackerv2).
+    - Implemented stable right-eye extraction using MediaPipe Face Mesh.
+    - Added automatic eye cropping with boundary validation and padding.
+    - Normalized eye crops to a fixed 128×128 resolution for CNN training.
+    - Built a fullscreen dataset collection tool with moving gaze targets.
+    - Automatically saved eye images with corresponding screen-coordinate labels.
+    - Generated a labeled gaze dataset (currently ~1200 samples).
+    - Refactored the project into two independent approaches:
+    - eyetrackerv1: Geometry-based gaze estimation using handcrafted features.
+    - eyetrackerv2: Appearance-based CNN pipeline for end-to-end gaze prediction.
+    - Organized project structure for future model training and inference.
+
+    Current Status:
+    - Stable eye crop generation achieved.
+    - Dataset collection pipeline operational.
+    - Ready to begin CNN model implementation and training.
+
+    Known limitations:
+    - Current dataset was collected without head-pose normalization.
+    - Data augmentation, train/validation split, and CNN training are pending.
+    Project Progress
+
+    ✓ Webcam acquisition
+    ✓ MediaPipe Face Mesh integration
+    ✓ Iris tracking
+    ✓ Geometry-based gaze estimation
+    ✓ Calibration prototype
+    ✓ Stable eye cropping
+    ✓ CNN dataset collection
+
+    Next:
+    □ CNN architecture
+    □ Model training
+    □ Live inference
+    □ Calibration refinement
+    □ Performance evaluation
