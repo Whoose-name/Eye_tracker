@@ -39,6 +39,8 @@ EYES = [
         "right_corner": 133,
         "upper_eyelid": 159,
         "lower_eyelid": 145,
+        "top_iris": 470,
+        "bottom_iris": 472,
         "ratio_pos": (20, 40),
         "direction_pos": (20, 80),
         "ear_pos": (20, 120),  # Position for EAR display
@@ -51,6 +53,8 @@ EYES = [
         "right_corner": 263,
         "upper_eyelid": 386,
         "lower_eyelid": 374,
+        "top_iris": 475,
+        "bottom_iris": 477,
         "ratio_pos": None,       # Will be calculated each frame
         "direction_pos": None,   # Will be calculated each frame
         "ear_pos": None,          # Will be calculated each frame
@@ -103,15 +107,20 @@ def calculate_iris_center(iris_points):
 
     return (center_x, center_y)
 
-def calculate_gaze(left_corner, right_corner, upper_eyelid, lower_eyelid, iris_center):
+def calculate_gaze(left_corner, right_corner, upper_eyelid, lower_eyelid, upper_iris, lower_iris, iris_center):
     eye_width = euclidean_distance(left_corner, right_corner)
     eye_height = euclidean_distance(upper_eyelid, lower_eyelid)
 
     iris_horizontal_distance = iris_center[0] - left_corner[0]
     horizontal_ratio = iris_horizontal_distance / eye_width
 
-    iris_vertical_distance = iris_center[1] - upper_eyelid[1]
-    vertical_ratio = iris_vertical_distance / eye_height
+    #iris_vertical_distance = iris_center[1] - upper_eyelid[1]
+    #vertical_offset= upper_eyelid[1] - iris_center[1]
+    #vertical_ratio = vertical_offset / eye_height
+    top_gap = upper_iris[1] - upper_eyelid[1]
+    bottom_gap = lower_eyelid[1] - lower_iris[1]
+    vertical_ratio = bottom_gap / (top_gap + bottom_gap) if (top_gap + bottom_gap) != 0 else 0
+    
  
     ear = eye_height / eye_width
 
@@ -184,15 +193,7 @@ while True:
 
             iris_center = calculate_iris_center(iris_points)
             cv2.circle(frame, iris_center, 5, PURPLE, -1)
-            cv2.putText(
-                frame,
-                "Center",
-                (iris_center[0] + 8, iris_center[1]),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.5,
-                PURPLE,
-                1
-            )
+            cv2.putText(frame,"Center",(iris_center[0] + 8, iris_center[1]),cv2.FONT_HERSHEY_SIMPLEX,0.5,PURPLE,1)
 
             # -----------------------------------
             # Eye Corners
@@ -202,24 +203,28 @@ while True:
             right_corner = face.landmark[eye["right_corner"]]
             upper_eyelid = face.landmark[eye["upper_eyelid"]]
             lower_eyelid = face.landmark[eye["lower_eyelid"]]
+            upper_iris = face.landmark[eye["top_iris"]]
+            lower_iris = face.landmark[eye["bottom_iris"]]
 
             left_corner = landmark_to_pixel(left_corner, w, h)
             right_corner = landmark_to_pixel(right_corner, w, h)
             upper_eyelid = landmark_to_pixel(upper_eyelid, w, h)
-            lower_eyelid = landmark_to_pixel(lower_eyelid, w, h)   
+            lower_eyelid = landmark_to_pixel(lower_eyelid, w, h)  
+            upper_iris = landmark_to_pixel(upper_iris, w, h)
+            lower_iris = landmark_to_pixel(lower_iris, w, h) 
 
             cv2.circle(frame, left_corner, 4, WHITE, -1)
             cv2.circle(frame, right_corner, 4, WHITE, -1)
             cv2.circle(frame, upper_eyelid, 4, WHITE, -1)
             cv2.circle(frame, lower_eyelid, 4, WHITE, -1)
+            cv2.circle(frame, upper_iris, 5, (255,255,0), -1)
+            cv2.circle(frame, lower_iris, 5, (255,255,0), -1)
 
             # -----------------------------------
             # Ratio Calculation
             # -----------------------------------
 
-            raw_horizontal_ratio,raw_vertical_ratio,direction,ear=calculate_gaze(left_corner, right_corner, 
-                                               upper_eyelid, lower_eyelid, 
-                                               iris_center)
+            raw_horizontal_ratio,raw_vertical_ratio,direction,ear=calculate_gaze(left_corner, right_corner,upper_eyelid, lower_eyelid, upper_iris, lower_iris, iris_center)
             ratio_pos = eye["ratio_pos"]
             direction_pos = eye["direction_pos"]
             ear_pos = eye["ear_pos"]
